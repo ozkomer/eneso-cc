@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // URL is configured in prisma.config.ts for migrations
+}
+
+// Affiliate Link model (read-only for this service)
+model AffiliateLink {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  originalUrl String   // Original affiliate URL
+  shortUrl    String   @unique // Shortened URL slug
+  customSlug  String?  @unique // Optional custom slug
+  imageUrl    String?  // Product image URL
+  
+  // Relations
+  userId      String
+  categoryId  String?
+  ecommerceBrandId String?
+  
+  // Status and tracking
+  isActive    Boolean  @default(true)
+  clickCount  Int      @default(0)
+  
+  // Metadata
+  tags        String[] // Array of tags
+  notes       String?  // Internal notes
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  clicks      Click[]
+  
+  @@index([shortUrl])
+  @@index([isActive])
+}
+
+// Click tracking model
+model Click {
+  id          String   @id @default(cuid())
+  linkId      String
+  link        AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  
+  // Tracking data
+  ipAddress   String?
+  userAgent   String?
+  referrer    String?
+  country     String?
+  city        String?
+  device      String?  // mobile, desktop, tablet
+  browser     String?
+  
+  // Conversion tracking
+  converted   Boolean  @default(false)
+  
+  timestamp   DateTime @default(now())
+  
+  @@index([linkId])
+  @@index([timestamp])
+}
+
