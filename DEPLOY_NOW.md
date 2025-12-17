@@ -45,3 +45,4 @@ Bu komut:
 
 Bu şekilde her push'ta otomatik deploy yapılır.
 
+

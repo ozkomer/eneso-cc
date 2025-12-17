@@ -64,3 +64,4 @@ https://eneso-cc.pages.dev/l/test-kulakık-testy
 
 Bu URL çalışmalı ve veritabanına bağlanabilmelidir.
 
+
