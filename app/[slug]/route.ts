@@ -143,18 +143,13 @@ export async function GET(
       });
 
     // Smart redirect logic (geni.us style):
-    // Always redirect to product detail page if frontend URL is configured
+    // Always redirect to product detail page
     // This matches the geni.us/EfAPH pattern where all links go to product pages
-    const frontendBaseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL;
+    const frontendBaseUrl = "https://enesozen.com";
     
-    if (frontendBaseUrl) {
-      // Redirect to product detail page (like geni.us)
-      const productUrl = `${frontendBaseUrl}/product/${link.shortUrl}`;
-      return NextResponse.redirect(productUrl, { status: 302 });
-    } else {
-      // Fallback: redirect to original affiliate URL if frontend not configured
-      return NextResponse.redirect(link.originalUrl, { status: 302 });
-    }
+    // Redirect to product detail page (like geni.us)
+    const productUrl = `${frontendBaseUrl}/product/${link.shortUrl}`;
+    return NextResponse.redirect(productUrl, { status: 302 });
   } catch (error: any) {
     console.error("Error processing redirect:", error);
     // Redirect to not-found page on error
