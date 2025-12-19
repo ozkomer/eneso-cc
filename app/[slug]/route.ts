@@ -142,14 +142,19 @@ export async function GET(
         console.error("Error incrementing click count:", error);
       });
 
-    // Smart redirect logic (geni.us style):
-    // Always redirect to product detail page
-    // This matches the geni.us/EfAPH pattern where all links go to product pages
+    // Smart redirect logic:
+    // If originalUrl exists, redirect directly to affiliate link
+    // Otherwise, redirect to product detail page
     const frontendBaseUrl = "https://enesozen.com";
     
-    // Redirect to product detail page (like geni.us)
-    const productUrl = `${frontendBaseUrl}/product/${link.shortUrl}`;
-    return NextResponse.redirect(productUrl, { status: 302 });
+    if (link.originalUrl) {
+      // Redirect directly to original affiliate URL
+      return NextResponse.redirect(link.originalUrl, { status: 302 });
+    } else {
+      // Fallback: redirect to product detail page
+      const productUrl = `${frontendBaseUrl}/product/${link.shortUrl}`;
+      return NextResponse.redirect(productUrl, { status: 302 });
+    }
   } catch (error: any) {
     console.error("Error processing redirect:", error);
     // Redirect to not-found page on error
