@@ -195,8 +195,8 @@ export async function GET(
       });
 
     // Smart redirect logic:
-    // If originalUrl exists, redirect directly to affiliate link
-    // Otherwise, redirect to product detail page
+    // Always redirect to product detail page (geni.us style)
+    // This allows users to see product details before going to e-commerce site
     const frontendBaseUrl = "https://enesozen.com";
     
     // Safety check: ensure link has shortUrl
@@ -205,14 +205,10 @@ export async function GET(
       return new NextResponse(null, { status: 404 });
     }
     
-    if (link.originalUrl) {
-      // Redirect directly to original affiliate URL
-      return NextResponse.redirect(link.originalUrl, { status: 302 });
-    } else {
-      // Fallback: redirect to product detail page
-      const productUrl = `${frontendBaseUrl}/product/${link.shortUrl}`;
-      return NextResponse.redirect(productUrl, { status: 302 });
-    }
+    // Always redirect to product detail page
+    const productUrl = `${frontendBaseUrl}/product/${link.shortUrl}`;
+    console.log(`Redirecting to product page: ${productUrl}`);
+    return NextResponse.redirect(productUrl, { status: 302 });
   } catch (error: any) {
     console.error("Error processing redirect:", error);
     // Return 500 instead of redirect to avoid redirect loops
