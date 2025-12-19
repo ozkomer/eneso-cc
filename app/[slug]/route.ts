@@ -76,9 +76,8 @@ export async function GET(
     // PostgreSQL'de case-sensitive arama için BINARY veya exact match kullanılır
     // Prisma'da case-sensitive arama için exact match kullanıyoruz
     
-    // Case-sensitive search for the link by shortUrl
-    // PostgreSQL'de case-sensitive arama için exact match kullanıyoruz
-    const link = await prisma.affiliateLink.findFirst({
+    // Try to find as AffiliateLink first
+    let link = await prisma.affiliateLink.findFirst({
       where: { 
         shortUrl: slug, // Exact match (case-sensitive in PostgreSQL)
         isActive: true,
@@ -90,9 +89,62 @@ export async function GET(
       },
     });
 
+    // If not found as AffiliateLink, try case-insensitive search
     if (!link) {
-      return NextResponse.redirect(new URL("/not-found", request.url), { status: 302 });
+      console.log(`AffiliateLink not found with case-sensitive search for slug: ${slug}, trying case-insensitive...`);
+      const linkArray = await prisma.$queryRaw<Array<{ id: string; shortUrl: string; originalUrl: string }>>`
+        SELECT id, "shortUrl", "originalUrl"
+        FROM "AffiliateLink"
+        WHERE LOWER("shortUrl") = LOWER(${slug})
+        AND "isActive" = true
+        LIMIT 1
+      `;
+      if (linkArray && linkArray.length > 0) {
+        link = linkArray[0];
+      }
     }
+
+    // If still not found, try to find as CuratedList (case-sensitive first)
+    if (!link) {
+      console.log(`AffiliateLink not found, trying CuratedList for slug: ${slug}`);
+      try {
+        let list = await prisma.$queryRaw<Array<{ id: string; shortUrl: string; slug: string }>>`
+          SELECT id, "shortUrl", slug
+          FROM "CuratedList"
+          WHERE "shortUrl" = ${slug}
+          LIMIT 1
+        `;
+
+        // If not found, try case-insensitive
+        if (!list || list.length === 0) {
+          list = await prisma.$queryRaw<Array<{ id: string; shortUrl: string; slug: string }>>`
+            SELECT id, "shortUrl", slug
+            FROM "CuratedList"
+            WHERE LOWER("shortUrl") = LOWER(${slug})
+            LIMIT 1
+          `;
+        }
+
+        if (list && list.length > 0) {
+          // Found a list, redirect to frontend list page
+          const frontendBaseUrl = "https://enesozen.com";
+          const listUrl = `${frontendBaseUrl}/list/${list[0].slug}`;
+          console.log(`CuratedList found: ${list[0].id}, redirecting to: ${listUrl}`);
+          return NextResponse.redirect(listUrl, { status: 302 });
+        }
+      } catch (error: any) {
+        console.error("Error querying CuratedList:", error.message);
+        // Continue to 404 if CuratedList query fails
+      }
+    }
+
+    if (!link) {
+      console.log(`Link/List not found for slug: ${slug}`);
+      // Return 404 instead of redirect to avoid redirect loops
+      return new NextResponse(null, { status: 404 });
+    }
+
+    console.log(`AffiliateLink found: ${link.id}, shortUrl: ${link.shortUrl}, originalUrl: ${link.originalUrl ? 'exists' : 'null'}`);
 
     // Get client IP address
     const forwarded = request.headers.get("x-forwarded-for");
@@ -147,6 +199,12 @@ export async function GET(
     // Otherwise, redirect to product detail page
     const frontendBaseUrl = "https://enesozen.com";
     
+    // Safety check: ensure link has shortUrl
+    if (!link.shortUrl) {
+      console.error(`Link found but shortUrl is missing: ${link.id}`);
+      return new NextResponse(null, { status: 404 });
+    }
+    
     if (link.originalUrl) {
       // Redirect directly to original affiliate URL
       return NextResponse.redirect(link.originalUrl, { status: 302 });
@@ -157,8 +215,8 @@ export async function GET(
     }
   } catch (error: any) {
     console.error("Error processing redirect:", error);
-    // Redirect to not-found page on error
-    return NextResponse.redirect(new URL("/not-found", request.url), { status: 302 });
+    // Return 500 instead of redirect to avoid redirect loops
+    return new NextResponse(null, { status: 500 });
   }
 }
 
