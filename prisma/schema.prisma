@@ -66,6 +66,54 @@ model Click {
   @@index([timestamp])
 }
 
+// CuratedList model (read-only for this service)
+model CuratedList {
+  id                String   @id @default(cuid())
+  title             String
+  slug              String   @unique
+  shortUrl          String?  @unique
+  description       String?
+  coverImage        String?
+  youtubeUrl        String?
+  isFeatured        Boolean  @default(false)
+  showDirectLinks   Boolean  @default(false)
+  clickCount        Int      @default(0)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  listClicks        ListClick[]
+  
+  @@index([slug])
+  @@index([shortUrl])
+}
+
+// ListClick tracking model
+model ListClick {
+  id          String   @id @default(cuid())
+  listId      String
+  list        CuratedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listUrlId   String? // Which specific ListUrl was clicked
+  
+  // Tracking data
+  ipAddress   String?
+  userAgent   String?
+  referrer    String?
+  country     String?
+  city        String?
+  device      String?  // mobile, desktop, tablet
+  browser     String?
+  
+  // Conversion tracking
+  converted   Boolean  @default(false)
+  
+  timestamp   DateTime @default(now())
+  
+  @@index([listId])
+  @@index([listUrlId])
+  @@index([timestamp])
+}
+
 
 
 

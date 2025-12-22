@@ -126,10 +126,61 @@ export async function GET(
         }
 
         if (list && list.length > 0) {
-          // Found a list, redirect to frontend list page
+          // Found a list, track click and redirect to frontend list page
+          const listId = list[0].id;
+          
+          // Get client IP address
+          const forwarded = request.headers.get("x-forwarded-for");
+          const ipAddress = forwarded
+            ? forwarded.split(",")[0].trim()
+            : request.headers.get("x-real-ip") || "unknown";
+
+          // Get user agent
+          const userAgent = request.headers.get("user-agent") || "unknown";
+
+          // Get referrer
+          const referrer = request.headers.get("referer") || request.headers.get("referrer") || null;
+
+          // Get geolocation data (async, but don't wait for it to redirect)
+          const geolocationPromise = getGeolocationFromIP(ipAddress);
+          const device = detectDevice(userAgent);
+          const browser = detectBrowser(userAgent);
+
+          // Get geolocation data
+          const { country, city } = await geolocationPromise;
+
+          // Create list click record (async, don't wait for it)
+          prisma.listClick
+            .create({
+              data: {
+                listId: listId,
+                ipAddress,
+                userAgent,
+                referrer,
+                country,
+                city,
+                device,
+                browser,
+                converted: false,
+              },
+            })
+            .catch((error: any) => {
+              console.error("Error creating list click record:", error);
+            });
+
+          // Increment list click count (async, don't wait for it)
+          prisma.curatedList
+            .update({
+              where: { id: listId },
+              data: { clickCount: { increment: 1 } },
+            })
+            .catch((error: any) => {
+              console.error("Error incrementing list click count:", error);
+            });
+
           const frontendBaseUrl = "https://enesozen.com";
           const listUrl = `${frontendBaseUrl}/list/${list[0].slug}`;
-          console.log(`CuratedList found: ${list[0].id}, redirecting to: ${listUrl}`);
+          console.log(`CuratedList found: ${listId}, redirecting to: ${listUrl}`);
           return NextResponse.redirect(listUrl, { status: 302 });
         }
       } catch (error: any) {
@@ -193,6 +244,7 @@ export async function GET(
       .catch((error) => {
         console.error("Error incrementing click count:", error);
       });
+      
 
     // Smart redirect logic:
     // Always redirect to product detail page (geni.us style)
