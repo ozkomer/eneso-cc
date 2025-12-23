@@ -104,6 +104,90 @@ export async function GET(
       }
     }
 
+    // If still not found, try to find as CustomLink (case-sensitive first)
+    if (!link) {
+      console.log(`AffiliateLink not found, trying CustomLink for slug: ${slug}`);
+      try {
+        let customLink = await prisma.$queryRaw<Array<{ id: string; shortUrl: string; targetUrl: string; clickCount: number }>>`
+          SELECT id, "shortUrl", "targetUrl", "clickCount"
+          FROM "CustomLink"
+          WHERE "shortUrl" = ${slug}
+          AND "isActive" = true
+          LIMIT 1
+        `;
+
+        // If not found, try case-insensitive
+        if (!customLink || customLink.length === 0) {
+          customLink = await prisma.$queryRaw<Array<{ id: string; shortUrl: string; targetUrl: string; clickCount: number }>>`
+            SELECT id, "shortUrl", "targetUrl", "clickCount"
+            FROM "CustomLink"
+            WHERE LOWER("shortUrl") = LOWER(${slug})
+            AND "isActive" = true
+            LIMIT 1
+          `;
+        }
+
+        if (customLink && customLink.length > 0) {
+          const customLinkId = customLink[0].id;
+          // Get client IP address
+          const forwarded = request.headers.get("x-forwarded-for");
+          const ipAddress = forwarded
+            ? forwarded.split(",")[0].trim()
+            : request.headers.get("x-real-ip") || "unknown";
+
+          // Get user agent
+          const userAgent = request.headers.get("user-agent") || "unknown";
+
+          // Get referrer
+          const referrer = request.headers.get("referer") || request.headers.get("referrer") || null;
+
+          // Get geolocation data (async, but don't wait for it to redirect)
+          const geolocationPromise = getGeolocationFromIP(ipAddress);
+          const device = detectDevice(userAgent);
+          const browser = detectBrowser(userAgent);
+
+          // Get geolocation data
+          const { country, city } = await geolocationPromise;
+
+          // Create custom link click record (async, don't wait for it)
+          prisma.customLinkClick
+            .create({
+              data: {
+                customLinkId: customLinkId,
+                ipAddress,
+                userAgent,
+                referrer,
+                country,
+                city,
+                device,
+                browser,
+                converted: false,
+              },
+            })
+            .catch((error: any) => {
+              console.error("Error creating custom link click record:", error);
+            });
+
+          // Increment custom link click count (async, don't wait for it)
+          prisma.customLink
+            .update({
+              where: { id: customLinkId },
+              data: { clickCount: { increment: 1 } },
+            })
+            .catch((error: any) => {
+              console.error("Error incrementing custom link click count:", error);
+            });
+
+          // Found a custom link, redirect directly to target URL
+          console.log(`CustomLink found: ${customLinkId}, redirecting to: ${customLink[0].targetUrl}`);
+          return NextResponse.redirect(customLink[0].targetUrl, { status: 302 });
+        }
+      } catch (error: any) {
+        console.error("Error querying CustomLink:", error.message);
+        // Continue to CuratedList check if CustomLink query fails
+      }
+    }
+
     // If still not found, try to find as CuratedList (case-sensitive first)
     if (!link) {
       console.log(`AffiliateLink not found, trying CuratedList for slug: ${slug}`);

@@ -114,6 +114,53 @@ model ListClick {
   @@index([timestamp])
 }
 
+// CustomLink model (read-only for this service)
+model CustomLink {
+  id          String   @id @default(cuid())
+  title       String
+  targetUrl   String   // Direct URL to redirect to
+  shortUrl    String   @unique // Shortened URL slug
+  description String?
+  isActive    Boolean  @default(true)
+  clickCount  Int      @default(0)
+  
+  userId      String
+  
+  tags        String[]
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  clicks      CustomLinkClick[]
+  
+  @@index([shortUrl])
+  @@index([isActive])
+}
+
+// CustomLinkClick tracking model
+model CustomLinkClick {
+  id          String   @id @default(cuid())
+  customLinkId String
+  customLink  CustomLink @relation(fields: [customLinkId], references: [id], onDelete: Cascade)
+  
+  // Tracking data
+  ipAddress   String?
+  userAgent   String?
+  referrer    String?
+  country     String?
+  city        String?
+  device      String?
+  browser     String?
+  
+  converted   Boolean  @default(false)
+  
+  timestamp   DateTime @default(now())
+  
+  @@index([customLinkId])
+  @@index([timestamp])
+}
+
 
 
 
